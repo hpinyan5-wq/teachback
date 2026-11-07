@@ -2,7 +2,7 @@
 
 **Close the AI tab and explain it back.** Paste an explanation from ChatGPT, Claude, Gemini or your notes. Teachback hides it, you explain it back from memory, and it shows exactly which key ideas you missed, then quizzes you on those gaps.
 
-**▶ Live demo:** `https://YOUR-USERNAME.github.io/teachback/?demo`
+**▶ Live demo:** `https://hpinyan5-wq.github.io/teachback/?demo`
 
 ![Teachback screenshot](screenshot.png)
 
@@ -40,7 +40,7 @@ It's one HTML file with no dependencies.
 ## Run it
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/teachback.git
+git clone https://github.com/hpinyan5-wq/teachback.git
 open teachback/index.html
 ```
 
