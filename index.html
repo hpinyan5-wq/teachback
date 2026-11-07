@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teachback — close the AI tab and explain it back</title>
+<meta name="description" content="Read an AI explanation, hide it, then explain it back from memory. Teachback shows which key ideas you missed, catches you reciting instead of explaining, and quizzes you on exactly your gaps. Free, instant, private.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2ea;--card:#fff;--ink:#14231a;--muted:#5f6f64;--line:#d6dfd2;--green:#1f8a4c;--green-soft:#dcf2e3;--red:#d4452c;--red-soft:#fde3dd;--amber:#c98a07;--amber-soft:#fdf0cf;--board:#173327;--radius:16px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:26px 22px 70px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+h1{font:800 46px/1 "Bricolage Grotesque",sans-serif;margin:0;letter-spacing:-.03em}
+h1 span{color:var(--green)}
+.lede{color:var(--muted);margin:8px 0 0;max-width:620px;font-size:16px}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{font:500 11px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;background:var(--card);border:1.5px solid var(--ink);border-radius:99px;padding:6px 10px}
+.steps{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:99px;background:var(--card);border:1.5px solid var(--line);font-weight:600;font-size:14px;color:var(--muted)}
+.step b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink);font-size:12px}
+.step.on{border-color:var(--ink);color:var(--ink)} .step.on b{background:var(--ink);color:#fff}
+.step.done b{background:var(--green);color:#fff}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px}
+.card h2{font:800 24px/1.15 "Bricolage Grotesque",sans-serif;margin:0 0 4px;letter-spacing:-.01em}
+.card .hint{color:var(--muted);margin:0 0 14px;font-size:14px}
+textarea{width:100%;min-height:240px;resize:vertical;border:1.5px solid var(--line);border-radius:12px;padding:14px;font:15px/1.65 Inter,system-ui,sans-serif;color:var(--ink);background:#fbfcfa}
+textarea:focus,input:focus{outline:2px solid var(--green);outline-offset:1px}
+.board{background:var(--board);color:#e9f3ec;border-radius:12px;padding:16px 18px;position:relative;font:15px/1.7 Inter,sans-serif;max-height:200px;overflow:auto}
+.board.hidden-src{filter:blur(7px);user-select:none;pointer-events:none}
+.peekwrap{position:relative}
+.peekbtn{position:absolute;inset:0;display:grid;place-items:center}
+button{font:600 14px/1 Inter,sans-serif;border-radius:11px;padding:12px 16px;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{background:#f2f5f0}
+button.main{background:var(--ink);color:#fff;font-size:15px;padding:14px 20px}
+button.main:hover{background:#000}
+button.green{background:var(--green);border-color:var(--green);color:#fff}
+button.sm{padding:8px 11px;font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.spacer{flex:1}
+.meta{font:500 12px "JetBrains Mono",monospace;color:var(--muted)}
+.score{display:grid;grid-template-columns:170px 1fr;gap:26px;align-items:center}
+@media(max-width:640px){.score{grid-template-columns:1fr}}
+.ring{width:170px;height:170px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .v{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .v b{font:800 44px/1 "Bricolage Grotesque",sans-serif;display:block}
+.ring .v span{font-size:12px;color:var(--muted)}
+.verdict{font:800 26px/1.2 "Bricolage Grotesque",sans-serif;margin:0 0 6px}
+.checks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+@media(max-width:700px){.checks{grid-template-columns:1fr}}
+.chk{border-radius:12px;padding:12px;border:1.5px solid var(--line);font-size:13px}
+.chk b{display:block;font-size:20px;font-family:"Bricolage Grotesque",sans-serif}
+.chk.good{background:var(--green-soft);border-color:#b7e2c5} .chk.warn{background:var(--amber-soft);border-color:#f0d690} .chk.bad{background:var(--red-soft);border-color:#f3c0b5}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border-radius:99px;padding:7px 12px;font-weight:600;font-size:14px;border:1.5px solid transparent;cursor:default}
+.chip.hit{background:var(--green-soft);color:var(--green)}
+.chip.miss{background:var(--red-soft);color:var(--red);cursor:pointer;border-color:#f3c0b5}
+.chip.miss:hover{border-color:var(--red)}
+.chip.miss.sel{background:var(--red);color:#fff}
+.gap{margin-top:14px;background:#fbfcfa;border:1.5px dashed var(--line);border-radius:12px;padding:14px;font-size:15px}
+.gap mark{background:#ffe08a;border-radius:3px;padding:0 2px}
+.q{padding:14px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0}
+.q p{margin:0 0 8px;font-size:15px}
+.q input{font:inherit;border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;width:240px;max-width:100%}
+.q .res{font-weight:600;margin-left:8px}
+.q .res.ok{color:var(--green)} .q .res.no{color:var(--red)}
+.blank{display:inline-block;min-width:90px;border-bottom:2px solid var(--ink);margin:0 3px}
+.hist{display:flex;gap:10px;align-items:flex-end;height:90px;margin-top:6px}
+.hist div{flex:0 0 46px;background:var(--green);border-radius:6px 6px 0 0;position:relative;min-height:4px}
+.hist div span{position:absolute;top:-20px;left:0;right:0;text-align:center;font:500 12px "JetBrains Mono",monospace}
+.hist div i{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-style:normal;font-size:11px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:800px){.two{grid-template-columns:1fr}}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(90px);opacity:0;background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;font-size:14px;transition:.25s;z-index:20}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.why{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}
+@media(max-width:760px){.why{grid-template-columns:1fr}}
+.why div{border-top:2.5px solid var(--ink);padding-top:10px;font-size:14px;color:var(--muted)}
+.why b{display:block;color:var(--ink);font:800 19px/1.2 "Bricolage Grotesque",sans-serif;margin-bottom:4px}
+footer{margin-top:40px;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Teach<span>back</span></h1>
+      <p class="lede">AI can explain anything, but reading an explanation isn't the same as understanding it. Paste what the AI told you, <b>hide it</b>, and explain it back in your own words. Teachback shows exactly what you missed and quizzes you on those gaps.</p>
+    </div>
+    <div class="pills"><span class="pill">Works with any AI</span><span class="pill">No account</span><span class="pill">Nothing uploaded</span></div>
+  </header>
+
+  <div class="steps" id="steps">
+    <div class="step on" data-s="1"><b>1</b>Read</div>
+    <div class="step" data-s="2"><b>2</b>Explain it back</div>
+    <div class="step" data-s="3"><b>3</b>See your gaps</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <section class="card" id="s1">
+    <h2>What did you just learn?</h2>
+    <p class="hint">Paste an explanation from ChatGPT, Claude or Gemini, or from your notes or a textbook paragraph. Read it carefully, because it's about to disappear.</p>
+    <textarea id="src" placeholder="e.g. paste ChatGPT's answer to “Explain how photosynthesis works”…"></textarea>
+    <div class="row"><button class="main" id="ready">I've read it. Hide it and test me →</button><button id="sample">Try an example</button><span class="spacer"></span><span class="meta" id="srcinfo"></span></div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="card" id="s2" hidden>
+    <h2>Now teach it back, from memory.</h2>
+    <p class="hint">Explain it as if you were teaching a 12-year-old. Use full sentences and plain words. No peeking (if you peek, Teachback will count it).</p>
+    <div class="peekwrap"><div class="board hidden-src" id="board"></div><div class="peekbtn"><button class="sm" id="peek">👀 Peek (counts against you)</button></div></div>
+    <textarea id="exp" style="margin-top:14px" placeholder="Start with the big idea, then explain how it works…"></textarea>
+    <div class="row"><button class="main green" id="check">Check my understanding →</button><button id="back">← Back</button><span class="spacer"></span><span class="meta" id="timer">0:00</span><span class="meta" id="expinfo"></span></div>
+  </section>
+
+  <!-- STEP 3 -->
+  <div id="s3" hidden></div>
+
+  <div class="why" id="why">
+    <div><b>Built on learning science</b>Explaining from memory (retrieval practice) beats re-reading. This is the Feynman technique, automated.</div>
+    <div><b>Made for the AI era</b>An AI answer feels understood the moment you read it. Teachback turns passive reading into active learning.</div>
+    <div><b>Instant and private</b>No AI grading and no account. It runs entirely in your browser, offline-capable, in under a second.</div>
+  </div>
+  <footer><span>Teachback · open source (MIT)</span><span>v1.0</span></footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('show'),2300); }
+
+const STOP = new Set(('a an the and or but if then than so of to in on at by for with from as is are was were be been being it its this that these those there their they them he she his her we our you your i me my not no do does did done can could will would should may might must have has had having into about over under also just very more most such which who whom whose what when where why how all any each both few other some own same too only out up down off again further once here because while during before after above below between through until against per via etc like into onto within without way ways thing things something someone example examples called known means mean uses use used using make makes made help helps let lets get gets got think simple simply basically essentially actually really important key main kind type types part parts lot lots many much several various often usually sometimes always never first second third finally next also new one two three four five six seven eight nine ten its it\'s that\'s there\'s here\'s let\'s you\'re they\'re we\'re can\'t don\'t doesn\'t isn\'t aren\'t won\'t imagine overall summary short think picture say said take takes form forms called turn turns become becomes need needs well even still absorb absorbs contain contains produce produces producing remove removes release releases releasing depend depends split splits happen happens look looks include includes provide provides allow allows create creates').split(' '));
+const TOK = /[A-Za-z][A-Za-z0-9\-]*(?:'[a-z]+)?|\d+(?:\.\d+)?/g;
+
+function stem(w){
+  w = w.toLowerCase();
+  if (w.length<=3) return w;
+  if (/ies$/.test(w) && w.length>4) return w.slice(0,-3)+'y';
+  if (/ves$/.test(w)) return w.slice(0,-3)+'f';
+  return w.replace(/(ing|ed|es|s)$/,'').replace(/(ation)$/,'ate') || w;
+}
+function tokens(str){ const out=[]; let m; TOK.lastIndex=0; while((m=TOK.exec(str))) out.push({raw:m[0], w:m[0].toLowerCase(), s:stem(m[0]), i:m.index}); return out; }
+function splitSentences(t){ return (t.replace(/\r/g,'').replace(/^\s*[-*•]\s*/gm,'').match(/[^.!?\n]+(?:[.!?]+|\n|$)/g)||[]).map(s=>s.trim()).filter(s=>s.split(/\s+/).length>=3); }
+function syllables(w){ w=w.toLowerCase().replace(/[^a-z]/g,''); if(w.length<=3) return 1; w=w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/,'').replace(/^y/,''); const m=w.match(/[aeiouy]{1,2}/g); return m?m.length:1; }
+function grade(text){ const s=splitSentences(text).length||1, words=(text.match(/[A-Za-z]+/g)||[]); if(!words.length) return 0; const syl=words.reduce((a,w)=>a+syllables(w),0); return Math.max(1, Math.round(0.39*(words.length/s)+11.8*(syl/words.length)-15.59)); }
+
+/* ---------- concept extraction ---------- */
+function concepts(src){
+  const sents = splitSentences(src);
+  const cand = new Map(); // key(stems) -> {label, n, freq, score, sents:Set}
+  sents.forEach((sent, si) => {
+    const toks = tokens(sent);
+    let run=[];
+    const flush = () => {
+      for (let n=1;n<=3;n++) for (let i=0;i+n<=run.length;i++){
+        const g = run.slice(i,i+n);
+        if (n===1 && ((g[0].w.length<4 && !/^[A-Z]{2,}$/.test(g[0].raw)) || /^\d/.test(g[0].w))) continue;
+        const key = g.map(t=>t.s).join(' ');
+        const c = cand.get(key) || {key, label:g.map(t=>t.raw).join(' '), n, freq:0, sents:new Set(), cap:false, first:si};
+        c.freq++; c.sents.add(si);
+        if (g.some((t,k)=> /^[A-Z]/.test(t.raw) && !(t.i===0))) c.cap=true;
+        cand.set(key,c);
+      }
+      run=[];
+    };
+    toks.forEach(t => { if (STOP.has(t.w) || t.w.length<2) flush(); else run.push(t); });
+    flush();
+  });
+  const list = [...cand.values()];
+  list.forEach(c => {
+    c.score = c.freq * (1 + 0.6*(c.n-1)) + (c.cap?0.6:0) + (c.first===0?0.4:0) + Math.min(c.label.length,14)/28;
+    if (c.n>1 && c.freq<2) c.score *= 0.55; // one-off phrases are weaker
+    const lastW = c.label.split(' ').pop();
+    if (/(ing|ed|ly)$/i.test(lastW) && !c.cap) c.score *= 0.35; // verbs/adverbs make weak concepts
+    if (/^[A-Z]{2,}$/.test(c.label) || /-/.test(c.label) || (c.n===1 && c.label.length>=8)) c.score += 0.7; // technical terms
+  });
+  list.sort((a,b)=>b.score-a.score);
+  const K = Math.max(6, Math.min(16, Math.round(sents.length*1.5)));
+  const picked=[];
+  for (const c of list){
+    if (picked.length>=K) break;
+    const parts = c.key.split(' ');
+    const clash = picked.find(p => { const pp=p.key.split(' '); return pp.every(x=>parts.includes(x)) || parts.every(x=>pp.includes(x)); });
+    if (clash){
+      // prefer the multi-word version if it is used repeatedly
+      if (c.n>clash.n && c.freq>=2 && c.freq >= clash.freq*0.6){ picked[picked.indexOf(clash)] = c; continue; }
+      if (c.n>clash.n && c.freq>=2 && clash.n===1 && clash.freq > c.freq*2 && !picked.some(p=>p!==clash && p.key.split(' ').some(x=>parts.includes(x)))){ picked.push(c); }
+      continue;
+    }
+    picked.push(c);
+  }
+  // lowercase labels unless proper nouns
+  picked.forEach(c => { if (!c.cap) c.label = c.label.toLowerCase(); c.weight = 1 + Math.log2(1+c.freq) + (c.n>1?0.5:0); });
+  return {sents, list:picked};
+}
+
+/* ---------- grading ---------- */
+function grade3(src, exp){
+  const C = concepts(src);
+  const expStems = new Set(tokens(exp).map(t=>t.s));
+  const expToks = tokens(exp);
+  let got=0, tot=0;
+  C.list.forEach(c => {
+    const parts=c.key.split(' ');
+    const hits=parts.filter(p=>expStems.has(p)).length;
+    c.hit = c.n===1 ? hits===1 : c.n===2 ? hits===2 : hits>=2;
+    tot += c.weight; if (c.hit) got += c.weight;
+  });
+  const score = tot ? Math.round(got/tot*100) : 0;
+  // parroting: share of explanation in 5-word runs copied from source
+  const sw = tokens(src).map(t=>t.w), N=5, grams=new Set();
+  for (let i=0;i+N<=sw.length;i++) grams.add(sw.slice(i,i+N).join(' '));
+  const ew = expToks.map(t=>t.w), cov=new Array(ew.length).fill(false);
+  for (let i=0;i+N<=ew.length;i++) if (grams.has(ew.slice(i,i+N).join(' '))) for(let j=i;j<i+N;j++) cov[j]=true;
+  const parrot = ew.length ? Math.round(cov.filter(Boolean).length/ew.length*100) : 0;
+  const own = new Set(expToks.filter(t=>!STOP.has(t.w) && t.w.length>3).map(t=>t.s));
+  const srcSt = new Set(tokens(src).map(t=>t.s));
+  const ownWords = [...own].filter(s=>!srcSt.has(s)).length; // words you brought yourself (analogies, examples)
+  return {C, score, parrot, words:ew.length, gExp:grade(exp), gSrc:grade(src), ownWords};
+}
+
+/* ---------- state ---------- */
+let attempts=[], peeks=0, t0=0, timerId=null, R=null, selMiss=null;
+function setStep(n){
+  [1,2].forEach(k => $('s'+k).hidden = k!==n);
+  $('s3').hidden = n!==3;
+  $('why').hidden = n!==1;
+  document.querySelectorAll('.step').forEach(el => { const s=+el.dataset.s; el.classList.toggle('on', s===n); el.classList.toggle('done', s<n); });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function startTimer(){ t0=Date.now(); clearInterval(timerId); timerId=setInterval(()=>{ const s=Math.floor((Date.now()-t0)/1000); $('timer').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500); }
+
+function ready(){
+  const src=$('src').value.trim();
+  if (splitSentences(src).length<2) return toast('Paste at least a few sentences to learn from');
+  $('board').textContent = src; $('board').classList.add('hidden-src');
+  $('exp').value=''; peeks=0; $('peek').textContent='👀 Peek (counts against you)';
+  setStep(2); startTimer(); setTimeout(()=>$('exp').focus(),300);
+}
+function peek(){
+  peeks++; const b=$('board'); b.classList.remove('hidden-src'); $('peek').parentElement.hidden=true;
+  toast('Peek #'+peeks+'. It hides again in 5 seconds');
+  setTimeout(()=>{ b.classList.add('hidden-src'); $('peek').parentElement.hidden=false; $('peek').textContent='👀 Peek again ('+peeks+' so far)'; },5000);
+}
+function check(){
+  const exp=$('exp').value.trim();
+  if ((exp.match(/[A-Za-z]+/g)||[]).length<12) return toast('Write at least a couple of sentences, the more the better');
+  clearInterval(timerId);
+  R = grade3($('src').value, exp);
+  attempts.push({score:R.score, peeks, secs:Math.round((Date.now()-t0)/1000)});
+  selMiss=null;
+  renderResults(); setStep(3);
+}
+
+function renderResults(){
+  const C=R.C, missed=C.list.filter(c=>!c.hit), hit=C.list.filter(c=>c.hit);
+  const sc=R.score, color = sc>=80?'var(--green)':sc>=55?'var(--amber)':'var(--red)';
+  const verdict = sc>=85?'You really get this.':sc>=65?'Solid, with a few gaps.':sc>=40?'You\'ve got the gist, not the details.':'This one hasn\'t stuck yet.';
+  const r=74, circ=2*Math.PI*r;
+  let h='<section class="card"><div class="score"><div class="ring"><svg width="170" height="170"><circle cx="85" cy="85" r="'+r+'" fill="none" stroke="#e3e9df" stroke-width="14"/><circle cx="85" cy="85" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="14" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+(circ*(1-sc/100))+'"/></svg><div class="v"><div><b>'+sc+'%</b><span>key ideas covered</span></div></div></div>';
+  h+='<div><p class="verdict">'+verdict+'</p><div style="color:var(--muted)">You explained <b style="color:var(--ink)">'+hit.length+' of '+C.list.length+'</b> key ideas in '+R.words+' words'+(attempts.length>1?', attempt '+attempts.length:'')+'.</div>';
+  const pClass = R.parrot>=35?'bad':R.parrot>=15?'warn':'good';
+  const gClass = R.gExp<=R.gSrc?'good':R.gExp<=R.gSrc+2?'warn':'bad';
+  const kClass = peeks===0?'good':peeks===1?'warn':'bad';
+  h+='<div class="checks">'+
+     '<div class="chk '+pClass+'"><b>'+R.parrot+'%</b>'+(pClass==='good'?'in your own words. You\'re explaining, not reciting.':'copied word-for-word from the source. Reciting isn\'t understanding.')+'</div>'+
+     '<div class="chk '+gClass+'"><b>Grade '+R.gExp+'</b>reading level (source: grade '+R.gSrc+'). '+(gClass==='good'?'Simple and clear, just like Feynman would want.':'Try simpler words and shorter sentences.')+'</div>'+
+     '<div class="chk '+kClass+'"><b>'+peeks+' peek'+(peeks===1?'':'s')+'</b>'+(peeks===0?'All from memory. That\'s real retrieval practice.':'Peeking turns recall back into re-reading.')+(R.ownWords>=5?' You also added '+R.ownWords+' ideas of your own.':'')+'</div></div></div></div></section>';
+
+  h+='<div class="two"><section class="card"><h2>Key ideas</h2><p class="hint">Green: you explained it. Red: you left it out. Click a red one to see what you missed.</p><div class="chips">'+
+     hit.map(c=>'<span class="chip hit">✓ '+esc(c.label)+'</span>').join('')+
+     missed.map((c,i)=>'<span class="chip miss'+(selMiss===c.key?' sel':'')+'" data-k="'+esc(c.key)+'">✗ '+esc(c.label)+'</span>').join('')+
+     '</div><div id="gapbox">'+(missed.length?'<div class="gap" style="color:var(--muted)">Click a red concept to see it in the original explanation.</div>':'<div class="gap">Nothing missed. Try explaining it to a friend next.</div>')+'</div></section>';
+
+  // quiz
+  const quiz = buildQuiz(C, missed);
+  h+='<section class="card"><h2>Gap quiz</h2><p class="hint">'+(quiz.length?'Fill in the blanks, built only from what you missed.':'You covered every key idea, so there\'s nothing to quiz.')+'</p><div id="quiz">'+
+     quiz.map((q,i)=>'<div class="q"><p>'+q.html+'</p><input data-i="'+i+'" placeholder="Your answer" autocomplete="off"><button class="sm" data-chk="'+i+'" style="margin-left:6px">Check</button><span class="res" id="qr'+i+'"></span></div>').join('')+
+     '</div></section></div>';
+
+  h+='<section class="card"><div class="row" style="margin-top:0"><div><h2 style="margin:0">Your progress</h2><p class="hint" style="margin:2px 0 0">Explain it again after reviewing your gaps. Most people jump 20+ points on attempt 2.</p></div><span class="spacer"></span>'+
+     '<button class="main green" id="again">Try again from memory</button><button id="review">📅 Schedule reviews</button><button id="newtopic">New topic</button></div>'+
+     '<div class="hist" style="margin:34px 0 20px">'+attempts.map((a,i)=>'<div style="height:'+Math.max(4,a.score*0.8)+'px;background:'+(a.score>=80?'var(--green)':a.score>=55?'var(--amber)':'var(--red)')+'"><span>'+a.score+'%</span><i>#'+(i+1)+'</i></div>').join('')+'</div></section>';
+  $('s3').innerHTML=h;
+
+  document.querySelectorAll('.chip.miss').forEach(el => el.onclick = () => showGap(el.dataset.k));
+  document.querySelectorAll('[data-chk]').forEach(b => b.onclick = () => gradeQ(+b.dataset.chk, quiz));
+  document.querySelectorAll('#quiz input').forEach(inp => inp.addEventListener('keydown', e => { if (e.key==='Enter') gradeQ(+inp.dataset.i, quiz); }));
+  $('again').onclick = () => { ready(); };
+  $('review').onclick = reviewICS;
+  $('newtopic').onclick = () => { attempts=[]; $('src').value=''; srcInfo(); setStep(1); };
+  if (selMiss) showGap(selMiss);
+}
+function sentHighlight(sent, keyParts){
+  let out='', last=0;
+  tokens(sent).forEach(t => { out+=esc(sent.slice(last,t.i)); out += keyParts.includes(t.s) ? '<mark>'+esc(t.raw)+'</mark>' : esc(t.raw); last=t.i+t.raw.length; });
+  return out+esc(sent.slice(last));
+}
+function showGap(key){
+  selMiss=key; const c=R.C.list.find(x=>x.key===key); if(!c) return;
+  document.querySelectorAll('.chip.miss').forEach(el => el.classList.toggle('sel', el.dataset.k===key));
+  const parts=key.split(' ');
+  const sents=[...c.sents].slice(0,2).map(i=>R.C.sents[i]);
+  $('gapbox').innerHTML='<div class="gap"><div class="meta" style="margin-bottom:6px">THE SOURCE SAID</div>'+sents.map(s=>'<p style="margin:0 0 8px">'+sentHighlight(s,parts)+'</p>').join('')+'</div>';
+}
+function buildQuiz(C, missed){
+  const used=new Set(), qs=[];
+  missed.slice(0,5).forEach(c => {
+    const parts=c.key.split(' ');
+    const si=[...c.sents].find(i=>!used.has(i)); if (si===undefined) return; used.add(si);
+    const sent=C.sents[si], toks=tokens(sent);
+    // find the run of tokens matching the concept
+    let start=-1;
+    for (let i=0;i+c.n<=toks.length;i++){ if (toks.slice(i,i+c.n).every((t,k)=>t.s===parts[k])){ start=i; break; } }
+    if (start<0) return;
+    const a=toks[start].i, endTok=toks[start+c.n-1], b=endTok.i+endTok.raw.length;
+    const answer=sent.slice(a,b);
+    qs.push({html:esc(sent.slice(0,a))+'<span class="blank"></span>'+esc(sent.slice(b)), answer, parts});
+  });
+  return qs;
+}
+function gradeQ(i, quiz){
+  const inp=document.querySelector('#quiz input[data-i="'+i+'"]'), q=quiz[i], res=$('qr'+i);
+  const given=new Set(tokens(inp.value).map(t=>t.s));
+  const ok = q.parts.every(p=>given.has(p));
+  res.className='res '+(ok?'ok':'no'); res.textContent = ok ? '✓ Correct' : '✗ Answer: '+q.answer;
+}
+function reviewICS(){
+  const title=(splitSentences($('src').value)[0]||'Review').slice(0,60);
+  const pad=n=>String(n).padStart(2,'0'), fmt=d=>d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
+  const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Teachback//EN','CALSCALE:GREGORIAN'];
+  [1,3,7,21].forEach(days => { const d=new Date(); d.setDate(d.getDate()+days); const e=new Date(d); e.setDate(e.getDate()+1);
+    L.push('BEGIN:VEVENT','UID:tb-'+Date.now()+'-'+days+'@teachback','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+fmt(d),'DTEND;VALUE=DATE:'+fmt(e),
+      'SUMMARY:🧠 Teachback review (day '+days+')','DESCRIPTION:Explain from memory: '+title.replace(/[,;\\]/g,' ')+'. Last score '+attempts[attempts.length-1].score+'%','END:VEVENT'); });
+  L.push('END:VCALENDAR');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([L.join('\r\n')],{type:'text/calendar'})); a.download='teachback-reviews.ics'; document.body.appendChild(a); a.click(); a.remove();
+  toast('Spaced reviews added: day 1, 3, 7 and 21');
+}
+function srcInfo(){ const n=splitSentences($('src').value).length; $('srcinfo').textContent = n ? n+' sentences · ~'+Math.max(1,Math.round(($('src').value.match(/\S+/g)||[]).length/200))+' min read' : ''; }
+
+const SAMPLE_SRC = `Photosynthesis is the process plants use to turn light energy into chemical energy stored in sugar. It happens inside chloroplasts, tiny structures in leaf cells that contain a green pigment called chlorophyll. Chlorophyll absorbs sunlight, mostly red and blue light, which is why leaves look green.
+
+Plants take in carbon dioxide from the air through small pores called stomata, and they absorb water through their roots. In the light-dependent reactions, light energy splits water molecules, releasing oxygen as a by-product and producing ATP and NADPH, which are energy carriers.
+
+In the second stage, called the Calvin cycle, the plant uses ATP and NADPH to turn carbon dioxide into glucose. The Calvin cycle does not need light directly, but it depends on the energy carriers made in the light-dependent reactions. Glucose is then used for energy and growth, or stored as starch. Overall, photosynthesis removes carbon dioxide from the atmosphere and produces the oxygen most living things breathe.`;
+const SAMPLE_EXP = `Photosynthesis is how plants make their own food from sunlight. It happens in the chloroplasts in the leaves, which have chlorophyll that makes them green and soaks up the light. The plant takes in carbon dioxide from the air and water from the roots, and it uses the light energy to turn them into glucose, which is a kind of sugar. Oxygen comes out as a by-product, which is lucky for us because we need it to breathe. It's kind of like a solar-powered kitchen inside every leaf.`;
+
+function init(){
+  $('ready').onclick=ready;
+  const loadSample=(quiet)=>{ $('src').value=SAMPLE_SRC; srcInfo(); attempts=[]; ready(); $('exp').value=SAMPLE_EXP; if(!quiet) toast('Example: a student\'s first attempt is filled in. Press Check.'); };
+  $('sample').onclick=()=>loadSample(false);
+  $('peek').onclick=peek;
+  $('check').onclick=check;
+  $('back').onclick=()=>{ clearInterval(timerId); setStep(1); };
+  $('src').addEventListener('input', srcInfo);
+  $('exp').addEventListener('input', ()=>{ const n=($('exp').value.match(/[A-Za-z]+/g)||[]).length; $('expinfo').textContent=n?n+' words':''; });
+  if (/(^|[?&#])demo\b/.test(location.search+location.hash)){ loadSample(true); setTimeout(check, 50); }
+}
+window.Teachback={concepts, grade3};
+init();
+})();
+</script>
+</body>
+</html>
